@@ -567,7 +567,100 @@ def test_Rational_Bezier_Surface_2():
 
     
 
-test_Rational_Bezier_Surface_2()
+def test_NURBS_1():
+    """
+    Tests the continuity enforcement method across many random pairs of 4x4 ``RationalBezierSurface``s.
+    """
+    #rng = np.random.default_rng(seed=42)
+    rng = np.random.default_rng(seed=60)
+    Assertion_error_counter=0
+    Negative_error_counter=0
+    num_enforced=0
+    flag=False
+    for n in range(40):
+
+        if flag==True:
+            break
+
+
+
+        cp_1 = np.array([[[0,0,rng.random()],[1,0,rng.random()],[2,0,rng.random()],[3,0,rng.random()],[4,0,rng.random()]],
+                         [[0,1,rng.random()],[1,1,rng.random()],[2,1,rng.random()],[3,1,rng.random()],[4,0,rng.random()]],
+                         [[0,2,rng.random()],[1,2,rng.random()],[2,2,rng.random()],[3,2,rng.random()],[4,0,rng.random()]],
+                         [[0,3,rng.random()],[1,3,rng.random()],[2,3,rng.random()],[3,3,rng.random()],[4,0,rng.random()]],
+                         [[0,4,rng.random()],[1,4,rng.random()],[2,4,rng.random()],[3,4,rng.random()],[4,4,rng.random()]]],dtype=np.float64)  
+
+        
+        
+        cp_2 = np.array([[[0,0,rng.random()],[1,0,rng.random()],[2,0,rng.random()],[3,0,rng.random()],[4,0,rng.random()]],
+                         [[0,1,rng.random()],[1,1,rng.random()],[2,1,rng.random()],[3,1,rng.random()],[4,0,rng.random()]],
+                         [[0,2,rng.random()],[1,2,rng.random()],[2,2,rng.random()],[3,2,rng.random()],[4,0,rng.random()]],
+                         [[0,3,rng.random()],[1,3,rng.random()],[2,3,rng.random()],[3,3,rng.random()],[4,0,rng.random()]],
+                         [[0,4,rng.random()],[1,4,rng.random()],[2,4,rng.random()],[3,4,rng.random()],[4,4,rng.random()]]],dtype=np.float64)  
+        
+        cp_2[:, :, 0] += 4 
+
+
+        w_1 = rng.uniform(0.8, 1.2, (np.shape(cp_1)[0], np.shape(cp_1)[1]))
+        w_2 = rng.uniform(0.8, 1.2, (np.shape(cp_2)[0], np.shape(cp_2)[1]))
+        
+        
+        p=3
+        m=4+p+1
+        u_knot=np.zeros(m+1)
+        u_knot[:(p+1)]=0
+        u_knot[-(p+1):]=1
+        u_knot[p+1]=0.5
+
+        v_knot=np.zeros(m+1)
+        v_knot[:(p+1)]=0
+        v_knot[-(p+1):]=1
+        v_knot[p+1]=0.5
+
+        print(f'{u_knot=},{v_knot=}')
+
+        
+        NURBS_1 = NURBSSurface(cp_1,u_knot,v_knot,w_1)
+        NURBS_2 = NURBSSurface(cp_2,u_knot,v_knot,w_2)
+
+        NURBS_1_org=copy.deepcopy(NURBS_1)
+        NURBS_2_org=copy.deepcopy(NURBS_2)
+        
+
+        #COUNT NUMBER OF ENFORCEMENTS TRIED
+        
+
+        for i in range(4):
+            for j in range(4):
+                side_self=SurfaceEdge(i)
+                side_other=SurfaceEdge(j)
+
+                #RESET TO ORIGINAL FOR EVERY ITERATION OF LOOP
+
+                NURBS_1=copy.deepcopy(NURBS_1_org)
+                NURBS_2=copy.deepcopy(NURBS_2_org)
+
+                try:
+                    NURBS_1.enforce_g0g1g2(NURBS_2, 1.0, side_self, side_other)
+                    
+                    # Verify G0, G1, and G2 continuity
+                    NURBS_1.verify_g0(NURBS_2, side_self, side_other)
+                    NURBS_1.verify_g1(NURBS_2, side_self, side_other)
+                    NURBS_1.verify_g2(NURBS_2, side_self, side_other)
+                except AssertionError:
+                    Assertion_error_counter+=1
+                    flag=True
+
+                except NegativeWeightError:
+                    Negative_error_counter+=1
+
+    print(f'{n=},{num_enforced=}')    
+    print(f'{n=},{Assertion_error_counter=}')
+    print(f'{n=},{Negative_error_counter=}')
+    #print(f'{fail_case_1=},{fail_case_2=}')
+
+    # return fail_case_1,fail_case_2,weight_case1,weight_case2
+test_NURBS_1()
 # fc1,fc2,w1,w2=test_Rational_Bezier_Surface_2()
 
 # print(f'{fc1=},{fc2=},{w1=},{w2=}')
