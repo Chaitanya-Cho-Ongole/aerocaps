@@ -7,7 +7,7 @@ from enum import Enum
 
 import numpy as np
 import pyvista as pv
-from scipy.optimize import fsolve
+from scipy.optimize import fsolve, minimize
 
 import aerocaps.iges.entity
 import aerocaps.iges.curves
@@ -15,7 +15,7 @@ import aerocaps.iges.surfaces
 from rust_nurbs import *
 from aerocaps.geom import Surface, InvalidGeometryError, NegativeWeightError, Geometry3D
 from aerocaps.geom.point import Point3D
-from aerocaps.geom.curves import Bezier3D, Line3D, RationalBezierCurve3D, NURBSCurve3D, BSpline3D
+from aerocaps.geom.curves import BezierCurve3D, Line3D, RationalBezierCurve3D, NURBSCurve3D, BSplineCurve3D
 from aerocaps.geom.plane import Plane
 from aerocaps.geom.tools import project_point_onto_line, measure_distance_point_line, rotate_point_about_axis, add_vector_to_point
 from aerocaps.geom.vector import Vector3D
@@ -62,7 +62,10 @@ class BezierSurface(Surface):
     """
     Bézier surface class. A NURBS surface with no internal knots and all weights equal to unity.
     """
-    def __init__(self, points: typing.List[typing.List[Point3D]] or np.ndarray):
+    def __init__(self,
+                 points: typing.List[typing.List[Point3D]] or np.ndarray,
+                 name: str = "BezierSurface",
+                 construction: bool = False):
         r"""
         A Bézier surface is a parametric surface described by a matrix of control points and defined on a rectangular
         domain :math:`\{u \in [0,1], v \in [0,1]\}`. The mathematical expression for the Bézier surface is identical
@@ -127,14 +130,61 @@ class BezierSurface(Surface):
             objects or an :obj:`~numpy.ndarray` of size :math:`(n+1) \times (m+1) \times 3`,
             where :math:`n` is the surface degree in the :math:`u`-parametric direction and :math:`m` is the
             surface degree in the :math:`v`-parametric direction
+        name: str
+            Name of the geometric object. May be re-assigned a unique name when added to a
+            :obj:`~aerocaps.geom.geometry_container.GeometryContainer`. Default: 'BezierSurface'
+        construction: bool
+            Whether this is a geometry used only for construction of other geometries. If ``True``, this
+            geometry will not be exported or plotted. Default: ``False``
         """
         if isinstance(points, np.ndarray):
             points = [[Point3D.from_array(pt_row) for pt_row in pt_mat] for pt_mat in points]
         self.points = points
-        self.degree_u = len(points) - 1
-        self.degree_v = len(points[0]) - 1
-        self.Nu = self.degree_u + 1
-        self.Nv = self.degree_v + 1
+        super().__init__(name=name, construction=construction)
+
+    @property
+    def n_points_u(self) -> int:
+        """Number of control points in the :math:`u`-parametric direction"""
+        return len(self.points)
+
+    @property
+    def n_points_v(self) -> int:
+        """Number of control points in the :math:`v`-parametric direction"""
+        return len(self.points[0])
+
+    @property
+    def degree_u(self) -> int:
+        """Surface degree in the :math:`u`-parametric direction"""
+        return self.n_points_u - 1
+
+    @property
+    def degree_v(self) -> int:
+        """Surface degree in the :math:`v`-parametric direction"""
+        return self.n_points_v - 1
+
+    @property
+    def n(self) -> int:
+        """
+        Shorthand for :obj:`~aerocaps.geom.surfaces.BezierSurface.degree_u`
+
+        Returns
+        -------
+        int
+            Surface degree in the :math:`u`-parametric direction
+        """
+        return self.degree_u
+
+    @property
+    def m(self) -> int:
+        """
+        Shorthand for :obj:`~aerocaps.geom.surfaces.BezierSurface.degree_v`
+
+        Returns
+        -------
+        int
+            Surface degree in the :math:`v`-parametric direction
+        """
+        return self.degree_v
 
     def to_iges(self, *args, **kwargs) -> aerocaps.iges.entity.IGESEntity:
         """
@@ -166,7 +216,7 @@ class BezierSurface(Surface):
         return np.array([np.array([p.as_array() for p in p_arr]) for p_arr in self.points])
 
     @classmethod
-    def from_curve_extrude(cls, curve: Bezier3D, distance: Length, extrude_axis: Vector3D = None,
+    def from_curve_extrude(cls, curve: BezierCurve3D, distance: Length, extrude_axis: Vector3D = None,
                            symmetric: bool = False, reverse: bool = False):
         """
         Creates a Bézier surface by extruding a Bézier curve along an axis.
@@ -177,7 +227,7 @@ class BezierSurface(Surface):
 
         Parameters
         ----------
-        curve: Bezier3D
+        curve: BezierCurve3D
             Curve to extrude. The most common use case is a planar curve, but this is not required.
         distance: Length
             Distance along the axis to extrude
@@ -734,7 +784,7 @@ class BezierSurface(Surface):
         P = self.get_control_point_array()
         return np.array(bezier_surf_eval_uvvecs(P, u, v))
 
-    def extract_edge_curve(self, surface_edge: SurfaceEdge) -> Bezier3D:
+    def extract_edge_curve(self, surface_edge: SurfaceEdge) -> BezierCurve3D:
         """
         Extracts the control points from one of the four edges of the Bézier surface and outputs a Bézier curve with
         these control points
@@ -746,19 +796,19 @@ class BezierSurface(Surface):
 
         Returns
         -------
-        Bezier3D
+        BezierCurve3D
             Bézier curve with control points corresponding to the control points along the edge of the surface
         """
         P = self.get_control_point_array()
 
         if surface_edge == SurfaceEdge.u0:
-            return Bezier3D.generate_from_array(P[0, :, :])
+            return BezierCurve3D(P[0, :, :])
         if surface_edge == SurfaceEdge.u1:
-            return Bezier3D.generate_from_array(P[-1, :, :])
+            return BezierCurve3D(P[-1, :, :])
         if surface_edge == SurfaceEdge.v0:
-            return Bezier3D.generate_from_array(P[:, 0, :])
+            return BezierCurve3D(P[:, 0, :])
         if surface_edge == SurfaceEdge.v1:
-            return Bezier3D.generate_from_array(P[:, -1, :])
+            return BezierCurve3D(P[:, -1, :])
 
         raise ValueError(f"Invalid surface edge {surface_edge}")
 
@@ -905,6 +955,42 @@ class BezierSurface(Surface):
         if surface_edge in [SurfaceEdge.v1, SurfaceEdge.v0]:
             return self.degree_v
         return self.degree_u
+
+    def get_parallel_n_points(self, surface_edge: SurfaceEdge) -> int:
+        r"""
+        Gets the number of control points in the parametric direction parallel to the input surface edge.
+
+        Parameters
+        ----------
+        surface_edge: SurfaceEdge
+            Edge along which the parallel number of control points is evaluated
+
+        Returns
+        -------
+        int
+            Number of control points parallel to the edge
+        """
+        if surface_edge in (SurfaceEdge.v1, SurfaceEdge.v0):
+            return self.n_points_u
+        return self.n_points_v
+
+    def get_perpendicular_n_points(self, surface_edge: SurfaceEdge) -> int:
+        r"""
+        Gets the number of control points in the parametric direction perpendicular to the input surface edge.
+
+        Parameters
+        ----------
+        surface_edge: SurfaceEdge
+            Edge along which the perpendicular number of control points is evaluated
+
+        Returns
+        -------
+        int
+            Number of control points perpendicular to the edge
+        """
+        if surface_edge in (SurfaceEdge.v1, SurfaceEdge.v0):
+            return self.n_points_v
+        return self.n_points_u
 
     def get_point(self, row_index: int, continuity_index: int, surface_edge: SurfaceEdge) -> Point3D:
         r"""
@@ -1121,6 +1207,130 @@ class BezierSurface(Surface):
         """
         self.enforce_g0g1(other, 1.0, surface_edge, other_surface_edge)
 
+    def enforce_g0g1_multiface(self,
+                               target_surf: "BezierSurface",
+                               f_u0: float = 1.0,
+                               f_u1: float = 1.0,
+                               f_v0: float = 1.0,
+                               f_v1: float = 1.0,
+                               adjacent_surf_u0: "BezierSurface" = None,
+                               adjacent_surf_u1: "BezierSurface" = None,
+                               adjacent_surf_v0: "BezierSurface" = None,
+                               adjacent_surf_v1: "BezierSurface" = None,
+                               other_edge_u0: SurfaceEdge = None,
+                               other_edge_u1: SurfaceEdge = None,
+                               other_edge_v0: SurfaceEdge = None,
+                               other_edge_v1: SurfaceEdge = None,
+                               n_deriv_points: int = 10,
+                               ):
+        adjacent_surfs = (adjacent_surf_u0, adjacent_surf_u1, adjacent_surf_v0, adjacent_surf_v1)
+        other_edges = (other_edge_u0, other_edge_u1, other_edge_v0, other_edge_v1)
+        # Input validation
+        if not any(adjacent_surfs):
+            raise ValueError("Must specify at least one adjacent surface")
+        if not any(other_edges):
+            raise ValueError("Must specify at least one other edge")
+        if len(adjacent_surfs) == 1:
+            raise ValueError("For continuity enforcement with only one other surface, use 'enforce_g0g1' instead")
+        if len(adjacent_surfs) != len(other_edges):
+            raise ValueError("Must specify one 'other_edge' for every 'adjacent_surf'")
+
+        # Create a mapping between the surfaces and edges
+        surf_edge_mapping = {
+            SurfaceEdge.u0: (adjacent_surf_u0, other_edge_u0, f_u0),
+            SurfaceEdge.u1: (adjacent_surf_u1, other_edge_u1, f_u1),
+            SurfaceEdge.v0: (adjacent_surf_v0, other_edge_v0, f_v0),
+            SurfaceEdge.v1: (adjacent_surf_v1, other_edge_v1, f_v1)
+        }
+        for self_edge, other_data in surf_edge_mapping.items():
+            if any(other_data) or all(other_data):
+                continue
+            raise ValueError("Must specify either both an 'adjacent_surf' and an 'other_edge' or neither for every "
+                             "edge of the current surface")
+
+        # Enforce G0 continuity with all surfaces
+        for self_edge in surf_edge_mapping.keys():
+            data = surf_edge_mapping[self_edge]
+            target_surf.enforce_g0(
+                data[0], surface_edge=self_edge, other_surface_edge=data[1]
+            )
+
+        first_derivs_other = {
+            self_edge: data[0].get_first_derivs_along_edge(data[1], n_points=n_deriv_points) if data[0] else None
+            for self_edge, data in surf_edge_mapping.items()
+        }
+
+        def evaluate_f_sign(surf_edge_1: SurfaceEdge, surf_edge_2: SurfaceEdge) -> float:
+            """
+            Evaluates the sign of the tangent proportionality factor across an edge pair
+
+            Parameters
+            ----------
+            surf_edge_1: SurfaceEdge
+                First surface edge
+            surf_edge_2: SurfaceEdge
+                Second surface edge
+
+            Returns
+            -------
+            float
+                ``1.0`` if positive, ``-1.0`` otherwise
+            """
+            surf_edges_0 = (SurfaceEdge.u0, SurfaceEdge.v0)
+            surf_edges_1 = (SurfaceEdge.u1, SurfaceEdge.v1)
+            if surf_edge_1 in surf_edges_0 and surf_edge_2 in surf_edges_0:
+                return -1.0
+            if surf_edge_1 in surf_edges_1 and surf_edge_2 in surf_edges_1:
+                return -1.0
+            return 1.0
+
+        def get_first_derivs_target() -> typing.Dict[SurfaceEdge, np.ndarray]:
+            return {
+                target_edge: target_surf.get_first_derivs_along_edge(target_edge, n_points=n_deriv_points)
+                if _data[0] else None for target_edge, _data in surf_edge_mapping.items()
+            }
+
+        def get_points_to_update() -> typing.List[Point3D]:
+            """Gets the points in the target surface that will be updated during the optimization"""
+            points_to_update = []
+            for surface_edge in surf_edge_mapping.keys():
+                # Loop through all the points in the second row starting from the second point and ending at the
+                # second-to-last point
+                for row_index in range(1, self.get_parallel_n_points(surface_edge) - 1):
+                    point = self.get_point(row_index, continuity_index=1, surface_edge=surface_edge)
+                    if point in points_to_update:
+                        continue
+                    points_to_update.append(point)
+            return points_to_update
+
+        f_signs = {self_edge: evaluate_f_sign(self_edge, data[1]) for self_edge, data in surf_edge_mapping.items()}
+        mod_points = get_points_to_update()
+        x0 = np.array([p.as_array() for p in mod_points]).flatten()
+
+        def obj_fun(x) -> np.ndarray:
+            x_reshaped = x.reshape((len(mod_points), 3))
+            # Update the points in-place
+            for i in range(x_reshaped.shape[0]):
+                mod_points[i].x.m = x_reshaped[i, 0]
+                mod_points[i].y.m = x_reshaped[i, 1]
+                mod_points[i].z.m = x_reshaped[i, 2]
+
+            # Evaluate the new derivatives on the target surface
+            first_derivs_target = get_first_derivs_target()
+
+            # Evaluate the objection function
+            obj_fun_val = 0.0  # This will be cast to a 1-D array
+            for target_edge in surf_edge_mapping.keys():
+                f = surf_edge_mapping[target_edge][2]
+                obj_fun_val += np.sum(
+                    (first_derivs_other[target_edge] - f_signs[target_edge] * 1/f * first_derivs_target[target_edge])**2
+                )
+
+            return obj_fun_val
+
+        res = minimize(obj_fun, x0)
+        print(f"{res = }")
+
     def enforce_g0g1g2(self, other: "BezierSurface", f: float,
                        surface_edge: SurfaceEdge, other_surface_edge: SurfaceEdge):
         r"""
@@ -1292,10 +1502,10 @@ class BezierSurface(Surface):
             return de_casteljau(i, j - 1, k) * (1 - u0) + de_casteljau(i + 1, j - 1, k) * u0
 
         bez_surf_split_1_P = np.array([
-            [de_casteljau(i=0, j=i, k=k) for i in range(self.Nu)] for k in range(self.Nv)
+            [de_casteljau(i=0, j=i, k=k) for i in range(self.n_points_u)] for k in range(self.n_points_v)
         ])
         bez_surf_split_2_P = np.array([
-            [de_casteljau(i=i, j=self.degree_u - i, k=k) for i in range(self.Nu)] for k in range(self.Nv)
+            [de_casteljau(i=i, j=self.degree_u - i, k=k) for i in range(self.n_points_u)] for k in range(self.n_points_v)
         ])
 
         return (
@@ -1342,10 +1552,10 @@ class BezierSurface(Surface):
             return de_casteljau(i, j - 1, k) * (1 - v0) + de_casteljau(i + 1, j - 1, k) * v0
 
         bez_surf_split_1_P = np.array([
-            [de_casteljau(i=0, j=i, k=k) for i in range(self.Nv)] for k in range(self.Nu)
+            [de_casteljau(i=0, j=i, k=k) for i in range(self.n_points_v)] for k in range(self.n_points_u)
         ])
         bez_surf_split_2_P = np.array([
-            [de_casteljau(i=i, j=self.degree_v - i, k=k) for i in range(self.Nv)] for k in range(self.Nu)
+            [de_casteljau(i=i, j=self.degree_v - i, k=k) for i in range(self.n_points_v)] for k in range(self.n_points_u)
         ])
 
         return (
@@ -1367,12 +1577,12 @@ class BezierSurface(Surface):
         lines = []
         control_points = self.get_control_point_array()
 
-        for i in range(self.Nu):
-            for j in range(self.Nv):
+        for i in range(self.n_points_u):
+            for j in range(self.n_points_v):
                 points.append(Point3D.from_array(control_points[i, j, :]))
 
-        for i in range(self.Nu - 1):
-            for j in range(self.Nv - 1):
+        for i in range(self.n_points_u - 1):
+            for j in range(self.n_points_v - 1):
                 point_obj_1 = Point3D.from_array(control_points[i, j, :])
                 point_obj_2 = Point3D.from_array(control_points[i + 1, j, :])
                 point_obj_3 = Point3D.from_array(control_points[i, j + 1, :])
@@ -1381,7 +1591,7 @@ class BezierSurface(Surface):
                 line_2 = Line3D(p0=point_obj_1, p1=point_obj_3)
                 lines.extend([line_1, line_2])
 
-                if i < self.Nu - 2 and j < self.Nv - 2:
+                if i < self.n_points_u - 2 and j < self.n_points_v - 2:
                     continue
 
                 point_obj_4 = Point3D.from_array(control_points[i + 1, j + 1, :])
@@ -1391,7 +1601,7 @@ class BezierSurface(Surface):
 
         return points, lines
 
-    def plot_surface(self, plot: pv.Plotter, Nu: int = 50, Nv: int = 50, **mesh_kwargs):
+    def plot_surface(self, plot: pv.Plotter, Nu: int = 50, Nv: int = 50, **mesh_kwargs) -> pv.StructuredGrid:
         """
         Plots the Bézier surface using the `pyvista <https://pyvista.org/>`_ library
 
@@ -1417,7 +1627,7 @@ class BezierSurface(Surface):
 
         return grid
 
-    def plot_control_point_mesh_lines(self, plot: pv.Plotter, **line_kwargs):
+    def plot_control_point_mesh_lines(self, plot: pv.Plotter, **line_kwargs) -> pv.Actor:
         """
         Plots the network of lines connecting the Bézier surface control points using the
         `pyvista <https://pyvista.org/>`_ library
@@ -1428,13 +1638,19 @@ class BezierSurface(Surface):
             :obj:`pyvista.Plotter` instance
         line_kwargs:
             Keyword arguments to pass to the :obj:`pyvista.Plotter.add_lines`
+
+        Returns
+        -------
+        pv.Actor
+            The lines actor
         """
         _, line_objs = self.generate_control_point_net()
         line_arr = np.array([[line_obj.p0.as_array(), line_obj.p1.as_array()] for line_obj in line_objs])
         line_arr = line_arr.reshape((len(line_objs) * 2, 3))
-        plot.add_lines(line_arr, **line_kwargs)
+        line_actor = plot.add_lines(line_arr, **line_kwargs)
+        return line_actor
 
-    def plot_control_points(self, plot: pv.Plotter, **point_kwargs):
+    def plot_control_points(self, plot: pv.Plotter, **point_kwargs) -> pv.Actor:
         """
         Plots the Bézier surface control points using the `pyvista <https://pyvista.org/>`_ library
 
@@ -1444,10 +1660,20 @@ class BezierSurface(Surface):
             :obj:`pyvista.Plotter` instance
         point_kwargs:
             Keyword arguments to pass to the :obj:`pyvista.Plotter.add_points`
+
+        Returns
+        -------
+        pv.Actor
+            The points actor
         """
         point_objs, _ = self.generate_control_point_net()
         point_arr = np.array([point_obj.as_array() for point_obj in point_objs])
-        plot.add_points(point_arr, **point_kwargs)
+        point_actor = plot.add_points(point_arr, **point_kwargs)
+        return point_actor
+
+    def __repr__(self):
+        return (f"{self.name}: {self.degree_u} x {self.degree_v} {self.__class__.__name__} "
+                f"({self.degree_u + 1} x {self.degree_v + 1} control points)")
 
 
 class RationalBezierSurface(Surface):
@@ -1457,7 +1683,22 @@ class RationalBezierSurface(Surface):
     def __init__(self,
                  points: typing.List[typing.List[Point3D]] or np.ndarray,
                  weights: np.ndarray,
+                 name: str = "RationalBezierSurface",
+                 construction: bool = False
                  ):
+        """
+
+        Parameters
+        ----------
+        points
+        weights
+        name: str
+            Name of the geometric object. May be re-assigned a unique name when added to a
+            :obj:`~aerocaps.geom.geometry_container.GeometryContainer`. Default: 'RationalBezierSurface'
+        construction: bool
+            Whether this is a geometry used only for construction of other geometries. If ``True``, this
+            geometry will not be exported or plotted. Default: ``False``
+        """
         if isinstance(points, np.ndarray):
             points = [[Point3D.from_array(pt_row) for pt_row in pt_mat] for pt_mat in points]
         self.points = points
@@ -1484,18 +1725,51 @@ class RationalBezierSurface(Surface):
         self._knots_u = knots_u
         self._knots_v = knots_v
         self.weights = weights
-        self.degree_u = degree_u
-        self.degree_v = degree_v
+        super().__init__(name=name, construction=construction)
 
     @property
     def n_points_u(self) -> int:
-        """Number of points in the :math:`u`-direction"""
+        """Number of control points in the :math:`u`-parametric direction"""
         return len(self.points)
 
     @property
     def n_points_v(self) -> int:
-        """Number of points in the :math:`v`-direction"""
+        """Number of control points in the :math:`v`-parametric direction"""
         return len(self.points[0])
+
+    @property
+    def degree_u(self) -> int:
+        """Surface degree in the :math:`u`-parametric direction"""
+        return self.n_points_u - 1
+
+    @property
+    def degree_v(self) -> int:
+        """Surface degree in the :math:`v`-parametric direction"""
+        return self.n_points_v - 1
+
+    @property
+    def n(self) -> int:
+        """
+        Shorthand for :obj:`~aerocaps.geom.surfaces.RationalBezierSurface.degree_u`
+
+        Returns
+        -------
+        int
+            Surface degree in the :math:`u`-parametric direction
+        """
+        return self.degree_u
+
+    @property
+    def m(self) -> int:
+        """
+        Shorthand for :obj:`~aerocaps.geom.surfaces.RationalBezierSurface.degree_v`
+
+        Returns
+        -------
+        int
+            Surface degree in the :math:`v`-parametric direction
+        """
+        return self.degree_v
 
     @property
     def knots_u(self) -> np.ndarray:
@@ -1623,13 +1897,13 @@ class RationalBezierSurface(Surface):
         return RationalBezierSurface(new_P, new_w)
 
     @classmethod
-    def from_bezier_revolve(cls, bezier: Bezier3D, axis: Line3D, start_angle: Angle, end_angle: Angle):
+    def from_bezier_revolve(cls, bezier: BezierCurve3D, axis: Line3D, start_angle: Angle, end_angle: Angle):
         """
         Creates a rational Bézier surface from the revolution of a Bézier curve about an axis.
 
         Parameters
         ----------
-        bezier: Bezier3D
+        bezier: BezierCurve3D
             Bézier curve to revolve
         axis: Line3D
             Axis of revolution
@@ -1701,10 +1975,10 @@ class RationalBezierSurface(Surface):
         return cls(control_points, weights)
 
     @staticmethod
-    def fill_surface_from_four_boundaries(left_curve: Bezier3D or RationalBezierCurve3D,
-                                          right_curve: Bezier3D or RationalBezierCurve3D,
-                                          top_curve: Bezier3D or RationalBezierCurve3D,
-                                          bottom_curve: Bezier3D or RationalBezierCurve3D) -> "RationalBezierSurface":
+    def fill_surface_from_four_boundaries(left_curve: BezierCurve3D or RationalBezierCurve3D,
+                                          right_curve: BezierCurve3D or RationalBezierCurve3D,
+                                          top_curve: BezierCurve3D or RationalBezierCurve3D,
+                                          bottom_curve: BezierCurve3D or RationalBezierCurve3D) -> "RationalBezierSurface":
         """
         Creates a fill surface from four boundary curves by linearly interpolating the ``left_curve`` and
         ``right_curve`` and displacing the edges created by the interpolation to form the ``top_curve``
@@ -1723,7 +1997,7 @@ class RationalBezierSurface(Surface):
 
         Parameters
         ----------
-        left_curve: Bezier3D or RationalBezierCurve3D
+        left_curve: BezierCurve3D or RationalBezierCurve3D
             Left boundary curve
         right_curve: Bezier3D or RationalBezierCurve3D
             Right boundary curve
@@ -1738,13 +2012,13 @@ class RationalBezierSurface(Surface):
             Fill surface
         """
         # Convert the boundary curves to rational Bézier curves if they are non-rational
-        if isinstance(left_curve, Bezier3D):
+        if isinstance(left_curve, BezierCurve3D):
             left_curve = left_curve.to_rational_bezier_curve()
-        if isinstance(right_curve, Bezier3D):
+        if isinstance(right_curve, BezierCurve3D):
             right_curve = right_curve.to_rational_bezier_curve()
-        if isinstance(top_curve, Bezier3D):
+        if isinstance(top_curve, BezierCurve3D):
             top_curve = top_curve.to_rational_bezier_curve()
-        if isinstance(bottom_curve, Bezier3D):
+        if isinstance(bottom_curve, BezierCurve3D):
             bottom_curve = bottom_curve.to_rational_bezier_curve()
 
         # Ensure the boundary curve loop is closed
@@ -1925,13 +2199,13 @@ class RationalBezierSurface(Surface):
         w = self.weights
 
         if surface_edge == SurfaceEdge.u0:
-            return RationalBezierCurve3D.generate_from_array(P[0, :, :], w[0, :])
+            return RationalBezierCurve3D(P[0, :, :], w[0, :])
         if surface_edge == SurfaceEdge.u1:
-            return RationalBezierCurve3D.generate_from_array(P[-1, :, :], w[-1, :])
+            return RationalBezierCurve3D(P[-1, :, :], w[-1, :])
         if surface_edge == SurfaceEdge.v0:
-            return RationalBezierCurve3D.generate_from_array(P[:, 0, :], w[:, 0])
+            return RationalBezierCurve3D(P[:, 0, :], w[:, 0])
         if surface_edge == SurfaceEdge.v1:
-            return RationalBezierCurve3D.generate_from_array(P[:, -1, :], w[:, -1])
+            return RationalBezierCurve3D(P[:, -1, :], w[:, -1])
 
         raise ValueError(f"Invalid surface edge {surface_edge}")
 
@@ -2327,13 +2601,6 @@ class RationalBezierSurface(Surface):
             of the current surface
         """
         self.enforce_g0g1(other, 1.0, surface_edge, other_surface_edge)
-
-    def enforce_g0g1_multiface(self, f: float,
-                               adjacent_surf_north: "RationalBezierSurface" = None,
-                               adjacent_surf_south: "RationalBezierSurface" = None,
-                               adjacent_surf_east: "RationalBezierSurface" = None,
-                               adjacent_surf_west: "RationalBezierSurface" = None):
-        pass
 
     def enforce_g0g1g2(self, other: "RationalBezierSurface", f: float or np.ndarray,
                        surface_edge: SurfaceEdge, other_surface_edge: SurfaceEdge):
@@ -3098,7 +3365,7 @@ class RationalBezierSurface(Surface):
         plot.add_mesh(grid, **mesh_kwargs)
         return grid
 
-    def plot_control_point_mesh_lines(self, plot: pv.Plotter, **line_kwargs):
+    def plot_control_point_mesh_lines(self, plot: pv.Plotter, **line_kwargs) -> pv.Actor:
         """
         Plots the network of lines connecting the rational Bézier surface control points using the
         `pyvista <https://pyvista.org/>`_ library
@@ -3109,13 +3376,19 @@ class RationalBezierSurface(Surface):
             :obj:`pyvista.Plotter` instance
         line_kwargs:
             Keyword arguments to pass to the :obj:`pyvista.Plotter.add_lines`
+
+        Returns
+        -------
+        pv.Actor
+            The lines actor
         """
         _, line_objs = self.generate_control_point_net()
         line_arr = np.array([[line_obj.p0.as_array(), line_obj.p1.as_array()] for line_obj in line_objs])
         line_arr = line_arr.reshape((len(line_objs) * 2, 3))
-        plot.add_lines(line_arr, **line_kwargs)
+        line_actor = plot.add_lines(line_arr, **line_kwargs)
+        return line_actor
 
-    def plot_control_points(self, plot: pv.Plotter, **point_kwargs):
+    def plot_control_points(self, plot: pv.Plotter, **point_kwargs) -> pv.Actor:
         """
         Plots the rational Bézier surface control points using the `pyvista <https://pyvista.org/>`_ library
 
@@ -3125,10 +3398,20 @@ class RationalBezierSurface(Surface):
             :obj:`pyvista.Plotter` instance
         point_kwargs:
             Keyword arguments to pass to the :obj:`pyvista.Plotter.add_points`
+
+        Returns
+        -------
+        pv.Actor
+            The points actor
         """
         point_objs, _ = self.generate_control_point_net()
         point_arr = np.array([point_obj.as_array() for point_obj in point_objs])
-        plot.add_points(point_arr, **point_kwargs)
+        point_actor = plot.add_points(point_arr, **point_kwargs)
+        return point_actor
+
+    def __repr__(self):
+        return (f"{self.name}: {self.degree_u} x {self.degree_v} {self.__class__.__name__} "
+                f"({self.degree_u + 1} x {self.degree_v + 1} control points)")
 
 
 class BSplineSurface(Surface):
@@ -3139,7 +3422,23 @@ class BSplineSurface(Surface):
                  points: typing.List[typing.List[Point3D]] or np.ndarray,
                  knots_u: np.ndarray,
                  knots_v: np.ndarray,
+                 name: str = "BSplineSurface",
+                 construction: bool = False
                  ):
+        """
+
+        Parameters
+        ----------
+        points
+        knots_u
+        knots_v
+        name: str
+            Name of the geometric object. May be re-assigned a unique name when added to a
+            :obj:`~aerocaps.geom.geometry_container.GeometryContainer`. Default: 'BSplineSurface'
+        construction: bool
+            Whether this is a geometry used only for construction of other geometries. If ``True``, this
+            geometry will not be exported or plotted. Default: ``False``
+        """
         if isinstance(points, np.ndarray):
             points = [[Point3D.from_array(pt_row) for pt_row in pt_mat] for pt_mat in points]
         self.points = points
@@ -3150,6 +3449,7 @@ class BSplineSurface(Surface):
         self.knots_v = knots_v
 
         self._weights = np.ones((len(points), len(points[0])))
+        super().__init__(name=name, construction=construction)
 
     @property
     def n_points_u(self) -> int:
@@ -3486,7 +3786,7 @@ class BSplineSurface(Surface):
         else:
             raise ValueError("Invalid surface_edge value")
 
-    def extract_edge_curve(self, surface_edge: SurfaceEdge) -> BSpline3D:
+    def extract_edge_curve(self, surface_edge: SurfaceEdge) -> BSplineCurve3D:
         """
         Extracts the control points, weights, and knots from one of the four edges of the B-spline surface and
         outputs a B-spline curve with these control points and weights
@@ -3498,20 +3798,20 @@ class BSplineSurface(Surface):
 
         Returns
         -------
-        BSpline3D
+        BSplineCurve3D
             B-spline curve with control points and knots corresponding to the control points and knots
             along the edge of the surface
         """
         P = self.get_control_point_array()
 
         if surface_edge == SurfaceEdge.u0:
-            return BSpline3D(P[0, :, :], self.knots_v, self.degree_v)
+            return BSplineCurve3D(P[0, :, :], self.knots_v, self.degree_v)
         if surface_edge == SurfaceEdge.u1:
-            return BSpline3D(P[-1, :, :], self.knots_v, self.degree_v)
+            return BSplineCurve3D(P[-1, :, :], self.knots_v, self.degree_v)
         if surface_edge == SurfaceEdge.v0:
-            return BSpline3D(P[:, 0, :], self.knots_u, self.degree_u)
+            return BSplineCurve3D(P[:, 0, :], self.knots_u, self.degree_u)
         if surface_edge == SurfaceEdge.v1:
-            return BSpline3D(P[:, -1, :], self.knots_u, self.degree_u)
+            return BSplineCurve3D(P[:, -1, :], self.knots_u, self.degree_u)
 
         raise ValueError(f"Invalid surface edge {surface_edge}")
 
@@ -4124,7 +4424,7 @@ class BSplineSurface(Surface):
         plot.add_mesh(grid, **mesh_kwargs)
         return grid
 
-    def plot_control_point_mesh_lines(self, plot: pv.Plotter, **line_kwargs):
+    def plot_control_point_mesh_lines(self, plot: pv.Plotter, **line_kwargs) -> pv.Actor:
         """
         Plots the network of lines connecting the B-spline surface control points using the
         `pyvista <https://pyvista.org/>`_ library
@@ -4135,13 +4435,19 @@ class BSplineSurface(Surface):
             :obj:`pyvista.Plotter` instance
         line_kwargs:
             Keyword arguments to pass to the :obj:`pyvista.Plotter.add_lines`
+
+        Returns
+        -------
+        pv.Actor
+            The lines actor
         """
         _, line_objs = self.generate_control_point_net()
         line_arr = np.array([[line_obj.p0.as_array(), line_obj.p1.as_array()] for line_obj in line_objs])
         line_arr = line_arr.reshape((len(line_objs) * 2, 3))
-        plot.add_lines(line_arr, **line_kwargs)
+        line_actor = plot.add_lines(line_arr, **line_kwargs)
+        return line_actor
 
-    def plot_control_points(self, plot: pv.Plotter, **point_kwargs):
+    def plot_control_points(self, plot: pv.Plotter, **point_kwargs) -> pv.Actor:
         """
         Plots the B-spline surface control points using the `pyvista <https://pyvista.org/>`_ library
 
@@ -4151,10 +4457,20 @@ class BSplineSurface(Surface):
             :obj:`pyvista.Plotter` instance
         point_kwargs:
             Keyword arguments to pass to the :obj:`pyvista.Plotter.add_points`
+
+        Returns
+        -------
+        pv.Actor
+            The points actor
         """
         point_objs, _ = self.generate_control_point_net()
         point_arr = np.array([point_obj.as_array() for point_obj in point_objs])
-        plot.add_points(point_arr, **point_kwargs)
+        point_actor = plot.add_points(point_arr, **point_kwargs)
+        return point_actor
+
+    def __repr__(self):
+        return (f"{self.name}: {self.degree_u} x {self.degree_v} {self.__class__.__name__} "
+                f"({self.n_points_u} x {self.n_points_v} control points)")
 
 
 class NURBSSurface(Surface):
@@ -4166,7 +4482,24 @@ class NURBSSurface(Surface):
                  knots_u: np.ndarray,
                  knots_v: np.ndarray,
                  weights: np.ndarray,
+                 name: str = "NURBSSurface",
+                 construction: bool = False
                  ):
+        """
+
+        Parameters
+        ----------
+        points
+        knots_u
+        knots_v
+        weights
+        name: str
+            Name of the geometric object. May be re-assigned a unique name when added to a
+            :obj:`~aerocaps.geom.geometry_container.GeometryContainer`. Default: 'NURBSSurface'
+        construction: bool
+            Whether this is a geometry used only for construction of other geometries. If ``True``, this
+            geometry will not be exported or plotted. Default: ``False``
+        """
         if isinstance(points, np.ndarray):
             points = [[Point3D.from_array(pt_row) for pt_row in pt_mat] for pt_mat in points]
         self.points = points
@@ -4185,6 +4518,7 @@ class NURBSSurface(Surface):
         self.knots_u = knots_u
         self.knots_v = knots_v
         self.weights = weights
+        super().__init__(name=name, construction=construction)
 
     @property
     def n_points_u(self) -> int:
@@ -4272,14 +4606,14 @@ class NURBSSurface(Surface):
         ))
 
     @classmethod
-    def from_bezier_revolve(cls, bezier: Bezier3D, axis: Line3D,
+    def from_bezier_revolve(cls, bezier: BezierCurve3D, axis: Line3D,
                             start_angle: Angle, end_angle: Angle) -> "NURBSSurface":
         """
         Creates a NURBS surface from the revolution of a Bézier curve about an axis.
 
         Parameters
         ----------
-        bezier: Bezier3D
+        bezier: BezierCurve3D
             Bézier curve to revolve
         axis: Line3D
             Axis of revolution
@@ -4739,30 +5073,31 @@ class NURBSSurface(Surface):
 
         raise ValueError(f"Invalid surface edge {surface_edge}")
     
-    def is_clamped(self,surface_edge:SurfaceEdge):
-        p=self.get_perpendicular_degree(surface_edge)
-        knot=self.get_perpendicular_knots(surface_edge)
-        if (surface_edge==SurfaceEdge.u0 or surface_edge==SurfaceEdge.v0):
-            Start_val=knot[0]
-            if (np.all(knot[:(p+1)]==Start_val)):
+    def is_clamped(self, surface_edge: SurfaceEdge) -> bool:
+        """
+        Checks if the NURBS surface is clamped along an edge
+
+        Parameters
+        ----------
+        surface_edge: SurfaceEdge
+            Edge where the perpendicular knots will be inspected
+
+        Returns
+        -------
+        bool
+            Whether the surface is clamped at the given edge
+        """
+        p = self.get_perpendicular_degree(surface_edge)
+        knots = self.get_perpendicular_knots(surface_edge)
+        if surface_edge in (SurfaceEdge.u0, SurfaceEdge.v0):
+            start_knot = knots[0]
+            if np.all(knots[:(p + 1)] == start_knot):
                 return True
-            else:
-                return False
-        elif(surface_edge==SurfaceEdge.u1 or surface_edge==SurfaceEdge.v1):
-            end_val=knot[-1]
-            if (np.all(knot[:-(p+1)]==end_val)):
-                return True
-            else:
-                return False
-    
-    @staticmethod
-    def _cast_uv(u: float or np.ndarray, v: float or np.ndarray) -> (float, float) or (np.ndarray, np.ndarray):
-        if not isinstance(u, np.ndarray):
-            u = np.array([u])
-        if not isinstance(v, np.ndarray):
-            v = np.array([v])
-    
-    
+            return False
+        end_knot = knots[-1]
+        if np.all(knots[-(p + 1):] == end_knot):
+            return True
+        return False
 
     def enforce_g0(self, other: "NURBSSurface",
                    surface_edge: SurfaceEdge, other_surface_edge: SurfaceEdge):
@@ -5525,7 +5860,7 @@ class NURBSSurface(Surface):
         plot.add_mesh(grid, **mesh_kwargs)
         return grid
 
-    def plot_control_point_mesh_lines(self, plot: pv.Plotter, **line_kwargs):
+    def plot_control_point_mesh_lines(self, plot: pv.Plotter, **line_kwargs) -> pv.Actor:
         """
         Plots the network of lines connecting the NURBS surface control points using the
         `pyvista <https://pyvista.org/>`_ library
@@ -5536,13 +5871,19 @@ class NURBSSurface(Surface):
             :obj:`pyvista.Plotter` instance
         line_kwargs:
             Keyword arguments to pass to the :obj:`pyvista.Plotter.add_lines`
+
+        Returns
+        -------
+        pv.Actor
+            The lines actor
         """
         _, line_objs = self.generate_control_point_net()
         line_arr = np.array([[line_obj.p0.as_array(), line_obj.p1.as_array()] for line_obj in line_objs])
         line_arr = line_arr.reshape((len(line_objs) * 2, 3))
-        plot.add_lines(line_arr, **line_kwargs)
+        line_actor = plot.add_lines(line_arr, **line_kwargs)
+        return line_actor
 
-    def plot_control_points(self, plot: pv.Plotter, **point_kwargs):
+    def plot_control_points(self, plot: pv.Plotter, **point_kwargs) -> pv.Actor:
         """
         Plots the NURBS surface control points using the `pyvista <https://pyvista.org/>`_ library
 
@@ -5552,20 +5893,47 @@ class NURBSSurface(Surface):
             :obj:`pyvista.Plotter` instance
         point_kwargs:
             Keyword arguments to pass to the :obj:`pyvista.Plotter.add_points`
+
+        Returns
+        -------
+        pv.Actor
+            The points actor
         """
         point_objs, _ = self.generate_control_point_net()
         point_arr = np.array([point_obj.as_array() for point_obj in point_objs])
-        plot.add_points(point_arr, **point_kwargs)
+        point_actor = plot.add_points(point_arr, **point_kwargs)
+        return point_actor
+
+    def __repr__(self):
+        return (f"{self.name}: {self.degree_u} x {self.degree_v} {self.__class__.__name__} "
+                f"({self.n_points_u} x {self.n_points_v} control points)")
 
 
 class TrimmedSurface(Surface):
     def __init__(self,
                  untrimmed_surface: Surface,
                  outer_boundary: Geometry3D,
-                 inner_boundaries: typing.List[Geometry3D] = None):
+                 inner_boundaries: typing.List[Geometry3D] = None,
+                 name: str = "TrimmedSurface",
+                 construction: bool = False):
+        """
+
+        Parameters
+        ----------
+        untrimmed_surface
+        outer_boundary
+        inner_boundaries
+        name: str
+            Name of the geometric object. May be re-assigned a unique name when added to a
+            :obj:`~aerocaps.geom.geometry_container.GeometryContainer`
+        construction: bool
+            Whether this is a geometry used only for construction of other geometries. If ``True``, this
+            geometry will not be exported or plotted. Default: ``False``
+        """
         self.untrimmed_surface = untrimmed_surface
         self.outer_boundary = outer_boundary
         self.inner_boundaries = inner_boundaries
+        super().__init__(name=name, construction=construction)
 
     def evaluate(self, Nu: int, Nv: int) -> np.ndarray:
         raise NotImplementedError("Evaluation not yet implemented for trimmed surfaces")
