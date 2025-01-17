@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import minimize_scalar
 
-from aerocaps.geom.curves import Bezier3D, PCurve2D, PCurve3D, Line3D
+from aerocaps.geom.curves import BezierCurve3D, PCurve2D, PCurve3D, Line3D
 from aerocaps.geom.point import Point3D, Point2D
 from aerocaps.geom.transformation import Transformation3D
 from aerocaps.geom.vector import Vector3D
@@ -73,7 +73,7 @@ def find_t_corresponding_to_minimum_distance_to_point2d(curve: PCurve2D, point: 
     point = point.as_array() if isinstance(point, Point2D) else point
 
     def minimize_func(t):
-        curve_point = curve.evaluate_single_t(t)
+        curve_point = curve.evaluate(t)
         return (curve_point[0] - point[0]) ** 2 + (curve_point[1] - point[1]) ** 2
 
     res = minimize_scalar(minimize_func, bounds=[0.0, 1.0])
@@ -86,14 +86,14 @@ def find_t_corresponding_to_minimum_distance_to_point3d(curve: PCurve3D, point: 
     point = point.as_array() if isinstance(point, Point3D) else point
 
     def minimize_func(t):
-        curve_point = curve.evaluate_single_t(t)
+        curve_point = curve.evaluate(t)
         return (curve_point[0] - point[0]) ** 2 + (curve_point[1] - point[1]) ** 2 + (curve_point[2] - point[2]) ** 2
 
     res = minimize_scalar(minimize_func, bounds=[0.0, 1.0])
     return res.x, np.sqrt(res.fun)
 
 
-def sweep_along_curve(primary_curve: Bezier3D, guide_curve: Bezier3D):
+def sweep_along_curve(primary_curve: BezierCurve3D, guide_curve: BezierCurve3D):
     point_list_3d = [primary_curve.control_points]
     for prev_point, current_point in zip(guide_curve.control_points[:-1], guide_curve.control_points[1:]):
         point_list_3d.append([primary_point + current_point - prev_point for primary_point in point_list_3d[-1]])
