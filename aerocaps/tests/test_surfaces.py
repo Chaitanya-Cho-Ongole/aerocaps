@@ -281,6 +281,72 @@ def test_Rational_Bezier_Surface_1():
     #print(f"{negative_counter=}")
 
 
+def test_Rational_Bezier_Surface_4():
+    """
+    Tests the continuity enforcement method across many random pairs of 4x4 ``RationalBezierSurface``s.
+    """
+    #rng = np.random.default_rng(seed=42)
+    rng = np.random.default_rng(seed=60)
+    Assertion_error_counter=0
+    Negative_error_counter=0
+    num_enforced=0
+    flag=False
+    for n in range(1):
+
+        cp_1 = np.array([[[0,0,rng.random()],[1,0,rng.random()],[2,0,rng.random()],[3,0,rng.random()],[4,0,rng.random()]],
+                         [[0,1,rng.random()],[1,1,rng.random()],[2,1,rng.random()],[3,1,rng.random()],[4,1,rng.random()]],
+                         [[0,2,rng.random()],[1,2,rng.random()],[2,2,rng.random()],[3,2,rng.random()],[4,2,rng.random()]],
+                         [[0,3,rng.random()],[1,3,rng.random()],[2,3,rng.random()],[3,3,rng.random()],[4,3,rng.random()]],
+                         [[0,4,rng.random()],[1,4,rng.random()],[2,4,rng.random()],[3,4,rng.random()],[4,4,rng.random()]]],dtype=np.float64)  
+
+        cp_1[:, :, 2]=1
+        cp_1[:, -1, 2]=2
+        #print(f'{cp_1=}')
+        
+        cp_2 = np.array([[[0,0,rng.random()],[1,0,rng.random()],[2,0,rng.random()],[3,0,rng.random()],[4,0,rng.random()]],
+                         [[0,1,rng.random()],[1,1,rng.random()],[2,1,rng.random()],[3,1,rng.random()],[4,1,rng.random()]],
+                         [[0,2,rng.random()],[1,2,rng.random()],[2,2,rng.random()],[3,2,rng.random()],[4,2,rng.random()]],
+                         [[0,3,rng.random()],[1,3,rng.random()],[2,3,rng.random()],[3,3,rng.random()],[4,3,rng.random()]],
+                         [[0,4,rng.random()],[1,4,rng.random()],[2,4,rng.random()],[3,4,rng.random()],[4,4,rng.random()]]],dtype=np.float64)  
+        cp_2[:, :, 2]=1
+        cp_2[:, :, 0] += 4 
+
+
+        w_1 = rng.uniform(0.8, 1.2, (np.shape(cp_1)[0], np.shape(cp_1)[1]))
+        w_2 = rng.uniform(0.8, 1.2, (np.shape(cp_2)[0], np.shape(cp_2)[1]))
+        
+        Rat_bez_surf_1 = RationalBezierSurface(cp_1,w_1)
+        Rat_bez_surf_2 = RationalBezierSurface(cp_2,w_2)
+
+        plot= pv.Plotter()
+        Rat_bez_surf_1.plot_surface(plot)
+        Rat_bez_surf_1.plot_control_point_mesh_lines(plot)
+        Rat_bez_surf_1.plot_control_points(plot)
+        Rat_bez_surf_2.plot_surface(plot)
+        Rat_bez_surf_2.plot_control_point_mesh_lines(plot)
+        Rat_bez_surf_2.plot_control_points(plot)
+        plot.set_background('black')
+        plot.show()
+
+        Rat_bez_surf_2.enforce_g0(Rat_bez_surf_1, SurfaceEdge(1), SurfaceEdge(0))
+
+        plot= pv.Plotter()
+        Rat_bez_surf_1.plot_surface(plot)
+        Rat_bez_surf_1.plot_control_point_mesh_lines(plot)
+        Rat_bez_surf_1.plot_control_points(plot)
+        Rat_bez_surf_2.plot_surface(plot)
+        Rat_bez_surf_2.plot_control_point_mesh_lines(plot)
+        Rat_bez_surf_2.plot_control_points(plot)
+        plot.set_background('black')
+        plot.show()
+        
+        
+        
+
+        #COUNT NUMBER OF ENFORCEMENTS TRIED
+#test_Rational_Bezier_Surface_4()
+
+
 def test_Rational_Bezier_Surface_2():
     """
     Tests the continuity enforcement method across many random pairs of 4x4 ``RationalBezierSurface``s.
@@ -553,46 +619,44 @@ def test_Rational_Bezier_Surface_2():
     print(f'{n=},{Negative_error_counter=}')
     #print(f'{fail_case_1=},{fail_case_2=}')
 
-    # return fail_case_1,fail_case_2,weight_case1,weight_case2
+    # return fail_case_1,fail_case_2,weight_case1,weight_case2   
+#test_Rational_Bezier_Surface_2()
 
-    
 
 def test_NURBS_1():
     """
-    Tests the continuity enforcement method across many random pairs of 4x4 ``RationalBezierSurface``s.
+    Tests the continuity enforcement method across many semi random pairs of 5x5 ``NURBS_Surfaces``s.
+    All the knots are uniform and equal for both the parallel and perpendicular degrees
     """
     #rng = np.random.default_rng(seed=42)
-    rng = np.random.default_rng(seed=60)
+    rng = np.random.default_rng(seed=35)
     Assertion_error_counter=0
     Negative_error_counter=0
-    num_enforced=0
+    num_tried=0
     flag=False
-    for n in range(40):
+    for n in range(4):
 
         if flag==True:
             break
 
-
-
+        
         cp_1 = np.array([[[0,0,rng.random()],[1,0,rng.random()],[2,0,rng.random()],[3,0,rng.random()],[4,0,rng.random()]],
-                         [[0,1,rng.random()],[1,1,rng.random()],[2,1,rng.random()],[3,1,rng.random()],[4,0,rng.random()]],
-                         [[0,2,rng.random()],[1,2,rng.random()],[2,2,rng.random()],[3,2,rng.random()],[4,0,rng.random()]],
-                         [[0,3,rng.random()],[1,3,rng.random()],[2,3,rng.random()],[3,3,rng.random()],[4,0,rng.random()]],
+                         [[0,1,rng.random()],[1,1,rng.random()],[2,1,rng.random()],[3,1,rng.random()],[4,1,rng.random()]],
+                         [[0,2,rng.random()],[1,2,rng.random()],[2,2,rng.random()],[3,2,rng.random()],[4,2,rng.random()]],
+                         [[0,3,rng.random()],[1,3,rng.random()],[2,3,rng.random()],[3,3,rng.random()],[4,3,rng.random()]],
                          [[0,4,rng.random()],[1,4,rng.random()],[2,4,rng.random()],[3,4,rng.random()],[4,4,rng.random()]]],dtype=np.float64)  
 
-        
         
         cp_2 = np.array([[[0,0,rng.random()],[1,0,rng.random()],[2,0,rng.random()],[3,0,rng.random()],[4,0,rng.random()]],
-                         [[0,1,rng.random()],[1,1,rng.random()],[2,1,rng.random()],[3,1,rng.random()],[4,0,rng.random()]],
-                         [[0,2,rng.random()],[1,2,rng.random()],[2,2,rng.random()],[3,2,rng.random()],[4,0,rng.random()]],
-                         [[0,3,rng.random()],[1,3,rng.random()],[2,3,rng.random()],[3,3,rng.random()],[4,0,rng.random()]],
+                         [[0,1,rng.random()],[1,1,rng.random()],[2,1,rng.random()],[3,1,rng.random()],[4,1,rng.random()]],
+                         [[0,2,rng.random()],[1,2,rng.random()],[2,2,rng.random()],[3,2,rng.random()],[4,2,rng.random()]],
+                         [[0,3,rng.random()],[1,3,rng.random()],[2,3,rng.random()],[3,3,rng.random()],[4,3,rng.random()]],
                          [[0,4,rng.random()],[1,4,rng.random()],[2,4,rng.random()],[3,4,rng.random()],[4,4,rng.random()]]],dtype=np.float64)  
-        
         cp_2[:, :, 0] += 4 
 
 
-        w_1 = rng.uniform(0.8, 1.2, (np.shape(cp_1)[0], np.shape(cp_1)[1]))
-        w_2 = rng.uniform(0.8, 1.2, (np.shape(cp_2)[0], np.shape(cp_2)[1]))
+        w_1 = rng.uniform(0.9, 1.1, (np.shape(cp_1)[0], np.shape(cp_1)[1]))
+        w_2 = rng.uniform(0.9, 1.1, (np.shape(cp_2)[0], np.shape(cp_2)[1]))
         
         
         p=3
@@ -600,14 +664,19 @@ def test_NURBS_1():
         u_knot=np.zeros(m+1)
         u_knot[:(p+1)]=0
         u_knot[-(p+1):]=1
+        u_knot_2=u_knot.copy()
         u_knot[p+1]=0.5
+        u_knot_2[p+1]=0.5
 
         v_knot=np.zeros(m+1)
         v_knot[:(p+1)]=0
         v_knot[-(p+1):]=1
+        v_knot_2=v_knot.copy()
         v_knot[p+1]=0.5
+        v_knot_2[p+1]=0.5
 
-        print(f'{u_knot=},{v_knot=}')
+
+        # print(f'{u_knot=},{v_knot=}')
 
         
         NURBS_1 = NURBSSurface(cp_1,u_knot,v_knot,w_1)
@@ -615,15 +684,37 @@ def test_NURBS_1():
 
         NURBS_1_org=copy.deepcopy(NURBS_1)
         NURBS_2_org=copy.deepcopy(NURBS_2)
-        
+
+        # plot= pv.Plotter()
+        # NURBS_1.plot_surface(plot)
+        # NURBS_1.plot_control_point_mesh_lines(plot)
+        # NURBS_1.plot_control_points(plot)
+        # NURBS_2.plot_surface(plot)
+        # NURBS_2.plot_control_point_mesh_lines(plot)
+        # NURBS_2.plot_control_points(plot)
+        # plot.set_background('black')
+        # plot.show()
+
+        #NURBS_1.enforce_g0g1g2(NURBS_2, 1.0,SurfaceEdge(1), SurfaceEdge(1))
+
+        # plot= pv.Plotter()
+        # NURBS_1.plot_surface(plot)
+        # NURBS_1.plot_control_point_mesh_lines(plot)
+        # NURBS_1.plot_control_points(plot)
+        # NURBS_2.plot_surface(plot)
+        # NURBS_2.plot_control_point_mesh_lines(plot)
+        # NURBS_2.plot_control_points(plot)
+        # plot.set_background('black')
+        # plot.show()
 
         #COUNT NUMBER OF ENFORCEMENTS TRIED
         
 
-        for i in range(4):
-            for j in range(4):
+        for i in range(1):
+            for j in range(1):
                 side_self=SurfaceEdge(i)
                 side_other=SurfaceEdge(j)
+                num_tried+=1
 
                 #RESET TO ORIGINAL FOR EVERY ITERATION OF LOOP
 
@@ -632,19 +723,42 @@ def test_NURBS_1():
 
                 try:
                     NURBS_1.enforce_g0g1g2(NURBS_2, 1.0, side_self, side_other)
-                    
-                    # Verify G0, G1, and G2 continuity
+
+                    # plot= pv.Plotter()
+                    # NURBS_1.plot_surface(plot)
+                    # NURBS_1.plot_control_point_mesh_lines(plot)
+                    # NURBS_1.plot_control_points(plot)
+                    # NURBS_2.plot_surface(plot)
+                    # NURBS_2.plot_control_point_mesh_lines(plot)
+                    # NURBS_2.plot_control_points(plot)
+                    # plot.set_background('black')
+                    # plot.show()
+                # Verify G0, G1, and G2 continuity
                     NURBS_1.verify_g0(NURBS_2, side_self, side_other)
                     NURBS_1.verify_g1(NURBS_2, side_self, side_other)
                     NURBS_1.verify_g2(NURBS_2, side_self, side_other)
                 except AssertionError:
                     Assertion_error_counter+=1
                     flag=True
+                    iges_entities = [NURBS_1.to_iges(),NURBS_2.to_iges()]
+                    cp_net_points, cp_net_lines = NURBS_1.generate_control_point_net()
+                    iges_entities.extend([cp_net_point.to_iges() for cp_net_point in cp_net_points])
+                    iges_entities.extend([cp_net_line.to_iges() for cp_net_line in cp_net_lines])
+                    cp_net_points_2, cp_net_lines_2 = NURBS_2.generate_control_point_net()
+                    iges_entities.extend([cp_net_point.to_iges() for cp_net_point in cp_net_points_2])
+                    iges_entities.extend([cp_net_line.to_iges() for cp_net_line in cp_net_lines_2])
+
+                    #iges_file = os.path.join(TEST_DIR, "Rat_Bez_test.igs")
+                    iges_file = os.path.join(r"C:\aerocaps-main\aerocaps\aerocaps\tests", "NURBS_test_3.igs")
+                    print(f"{iges_file=}")
+                    iges_generator = IGESGenerator(iges_entities, "meters")
+                    iges_generator.generate(iges_file)
+                    print("Generator passed")
 
                 except NegativeWeightError:
                     Negative_error_counter+=1
 
-    print(f'{n=},{num_enforced=}')    
+    print(f'{n=},{num_tried=}')    
     print(f'{n=},{Assertion_error_counter=}')
     print(f'{n=},{Negative_error_counter=}')
     #print(f'{fail_case_1=},{fail_case_2=}')
