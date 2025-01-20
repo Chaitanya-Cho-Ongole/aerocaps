@@ -299,8 +299,8 @@ def test_Rational_Bezier_Surface_4():
                          [[0,3,rng.random()],[1,3,rng.random()],[2,3,rng.random()],[3,3,rng.random()],[4,3,rng.random()]],
                          [[0,4,rng.random()],[1,4,rng.random()],[2,4,rng.random()],[3,4,rng.random()],[4,4,rng.random()]]],dtype=np.float64)  
 
-        cp_1[:, :, 2]=1
-        cp_1[:, -1, 2]=2
+        # cp_1[:, :, 2]=1
+        # cp_1[:, -1, 2]=2
         #print(f'{cp_1=}')
         
         cp_2 = np.array([[[0,0,rng.random()],[1,0,rng.random()],[2,0,rng.random()],[3,0,rng.random()],[4,0,rng.random()]],
@@ -308,7 +308,7 @@ def test_Rational_Bezier_Surface_4():
                          [[0,2,rng.random()],[1,2,rng.random()],[2,2,rng.random()],[3,2,rng.random()],[4,2,rng.random()]],
                          [[0,3,rng.random()],[1,3,rng.random()],[2,3,rng.random()],[3,3,rng.random()],[4,3,rng.random()]],
                          [[0,4,rng.random()],[1,4,rng.random()],[2,4,rng.random()],[3,4,rng.random()],[4,4,rng.random()]]],dtype=np.float64)  
-        cp_2[:, :, 2]=1
+        # cp_2[:, :, 2]=1
         cp_2[:, :, 0] += 4 
 
 
@@ -318,33 +318,35 @@ def test_Rational_Bezier_Surface_4():
         Rat_bez_surf_1 = RationalBezierSurface(cp_1,w_1)
         Rat_bez_surf_2 = RationalBezierSurface(cp_2,w_2)
 
-        plot= pv.Plotter()
-        Rat_bez_surf_1.plot_surface(plot)
-        Rat_bez_surf_1.plot_control_point_mesh_lines(plot)
-        Rat_bez_surf_1.plot_control_points(plot)
-        Rat_bez_surf_2.plot_surface(plot)
-        Rat_bez_surf_2.plot_control_point_mesh_lines(plot)
-        Rat_bez_surf_2.plot_control_points(plot)
-        plot.set_background('black')
-        plot.show()
+        # plot= pv.Plotter()
+        # Rat_bez_surf_1.plot_surface(plot)
+        # Rat_bez_surf_1.plot_control_point_mesh_lines(plot)
+        # Rat_bez_surf_1.plot_control_points(plot)
+        # Rat_bez_surf_2.plot_surface(plot)
+        # Rat_bez_surf_2.plot_control_point_mesh_lines(plot)
+        # Rat_bez_surf_2.plot_control_points(plot)
+        # plot.set_background('black')
+        # plot.show()
 
-        Rat_bez_surf_2.enforce_g0(Rat_bez_surf_1, SurfaceEdge(1), SurfaceEdge(0))
-
-        plot= pv.Plotter()
-        Rat_bez_surf_1.plot_surface(plot)
-        Rat_bez_surf_1.plot_control_point_mesh_lines(plot)
-        Rat_bez_surf_1.plot_control_points(plot)
-        Rat_bez_surf_2.plot_surface(plot)
-        Rat_bez_surf_2.plot_control_point_mesh_lines(plot)
-        Rat_bez_surf_2.plot_control_points(plot)
-        plot.set_background('black')
-        plot.show()
+        Rat_bez_surf_2.enforce_g0g1g2(Rat_bez_surf_2,1.0, SurfaceEdge(1), SurfaceEdge(1))
+        Rat_bez_surf_1.verify_g0(Rat_bez_surf_2, SurfaceEdge(1), SurfaceEdge(1))
+        Rat_bez_surf_1.verify_g1(Rat_bez_surf_2, SurfaceEdge(1), SurfaceEdge(1))
+        Rat_bez_surf_1.verify_g2(Rat_bez_surf_2, SurfaceEdge(1), SurfaceEdge(1))
+        # plot= pv.Plotter()
+        # Rat_bez_surf_1.plot_surface(plot)
+        # Rat_bez_surf_1.plot_control_point_mesh_lines(plot)
+        # Rat_bez_surf_1.plot_control_points(plot)
+        # Rat_bez_surf_2.plot_surface(plot)
+        # Rat_bez_surf_2.plot_control_point_mesh_lines(plot)
+        # Rat_bez_surf_2.plot_control_points(plot)
+        # plot.set_background('black')
+        # plot.show()
         
         
         
 
         #COUNT NUMBER OF ENFORCEMENTS TRIED
-#test_Rational_Bezier_Surface_4()
+test_Rational_Bezier_Surface_4()
 
 
 def test_Rational_Bezier_Surface_2():
@@ -764,7 +766,7 @@ def test_NURBS_1():
     #print(f'{fail_case_1=},{fail_case_2=}')
 
     # return fail_case_1,fail_case_2,weight_case1,weight_case2
-test_NURBS_1()
+#test_NURBS_1()
 # fc1,fc2,w1,w2=test_Rational_Bezier_Surface_2()
 
 # print(f'{fc1=},{fc2=},{w1=},{w2=}')
