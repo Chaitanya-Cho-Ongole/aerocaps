@@ -6665,6 +6665,9 @@ class NURBSSurface(Surface):
         # evaluated at "n_points" locations along the boundary
         self_perp_edge_derivs = self.get_first_derivs_along_edge(surface_edge, n_points=n_points, perp=True)
         other_perp_edge_derivs = other.get_first_derivs_along_edge(other_surface_edge, n_points=n_points, perp=True)
+        print("g1 test")
+        print(f'{self_perp_edge_derivs=}')
+        print(f'{other_perp_edge_derivs=}')
         self_perp_edge_derivs[np.absolute(self_perp_edge_derivs) < 1e-6] = 0.0
         other_perp_edge_derivs[np.absolute(other_perp_edge_derivs) < 1e-6] = 0.0
 
@@ -6719,8 +6722,8 @@ class NURBSSurface(Surface):
         #print(f"{self_perp_edge_derivs=},{other_perp_edge_derivs=}")
         self_perp_edge_derivs[np.absolute(self_perp_edge_derivs) < 1e-6] = 0.0
         other_perp_edge_derivs[np.absolute(other_perp_edge_derivs) < 1e-6] = 0.0
-        print(f'{self_perp_edge_derivs=}')
-        print(f'{other_perp_edge_derivs=}')
+        # print(f'{self_perp_edge_derivs=}')
+        # print(f'{other_perp_edge_derivs=}')
 
         ratios_other_self = other_perp_edge_derivs / self_perp_edge_derivs
         #print(f"{ratios_other_self=}")

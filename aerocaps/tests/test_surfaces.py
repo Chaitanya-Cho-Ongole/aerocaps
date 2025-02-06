@@ -17,6 +17,8 @@ from aerocaps.iges.iges_generator import IGESGenerator
 from aerocaps.geom.geometry_container import GeometryContainer
 from aerocaps import TEST_DIR
 
+from rust_nurbs import *
+
 
 def test_nurbs_revolve():
     axis = Line3D(p0=Point3D.from_array(np.array([0.0, 0.0, 0.0])),
@@ -346,7 +348,7 @@ def test_Rational_Bezier_Surface_4():
         
 
         #COUNT NUMBER OF ENFORCEMENTS TRIED
-test_Rational_Bezier_Surface_4()
+#test_Rational_Bezier_Surface_4()
 
 
 def test_Rational_Bezier_Surface_2():
@@ -636,7 +638,7 @@ def test_NURBS_1():
     Negative_error_counter=0
     num_tried=0
     flag=False
-    for n in range(4):
+    for n in range(1):
 
         if flag==True:
             break
@@ -697,7 +699,46 @@ def test_NURBS_1():
         # plot.set_background('black')
         # plot.show()
 
-        #NURBS_1.enforce_g0g1g2(NURBS_2, 1.0,SurfaceEdge(1), SurfaceEdge(1))
+        NURBS_1.enforce_g0g1g2(NURBS_2, 1.0,SurfaceEdge(0), SurfaceEdge(1))
+        # NURBS_1.verify_g0(NURBS_2, SurfaceEdge(0), SurfaceEdge(1))
+        NURBS_1.verify_g1(NURBS_2, SurfaceEdge(0), SurfaceEdge(1))
+        #NURBS_1.verify_g2(NURBS_2, SurfaceEdge(0), SurfaceEdge(1))
+
+        #COMPARE TO FDM
+        pts_edge=10
+        edge_par_vals=np.linspace(0,1,pts_edge)
+        step=1e-10
+        FDM_second_der_self_array=np.zeros((10,3))
+        FDM_first_der_self_array=np.zeros((10,3))
+        for index in range(10):
+            term1_1st=np.array([nurbs_surf_eval(cp_1,w_1,u_knot,v_knot,edge_par_vals[index],1.0)])[0]
+            term2_1st=np.array([nurbs_surf_eval(cp_1,w_1,u_knot,v_knot,edge_par_vals[index],1.0-step)])[0]
+            FDM_first_der_self_array[index,:]=(term1_1st-term2_1st)/step
+            term1=np.array([nurbs_surf_eval(cp_1,w_1,u_knot,v_knot,edge_par_vals[index],1.0)])[0]
+            term2=np.array([nurbs_surf_eval(cp_1,w_1,u_knot,v_knot,edge_par_vals[index],1.0-step)])[0]
+            term3=np.array([nurbs_surf_eval(cp_1,w_1,u_knot,v_knot,edge_par_vals[index],1.0-2*step)])[0]
+            FDM_second_der_self_array[index,:]=(term1-2*term2+term3)/(step**2)
+        print(f'{FDM_first_der_self_array=}')
+        print(f'{FDM_second_der_self_array=}')
+
+        iges_entities = [NURBS_1.to_iges(),NURBS_2.to_iges()]
+        cp_net_points, cp_net_lines = NURBS_1.generate_control_point_net()
+        iges_entities.extend([cp_net_point.to_iges() for cp_net_point in cp_net_points])
+        iges_entities.extend([cp_net_line.to_iges() for cp_net_line in cp_net_lines])
+        cp_net_points_2, cp_net_lines_2 = NURBS_2.generate_control_point_net()
+        iges_entities.extend([cp_net_point.to_iges() for cp_net_point in cp_net_points_2])
+        iges_entities.extend([cp_net_line.to_iges() for cp_net_line in cp_net_lines_2])
+
+        #iges_file = os.path.join(TEST_DIR, "Rat_Bez_test.igs")
+        iges_file = os.path.join(r"C:\aerocaps-main\aerocaps\aerocaps\tests", "NURBS_test_3.igs")
+        print(f"{iges_file=}")
+        iges_generator = IGESGenerator(iges_entities, "meters")
+        iges_generator.generate(iges_file)
+        print("Generator passed")
+
+        NURBS_1.verify_g2(NURBS_2, SurfaceEdge(0), SurfaceEdge(1))
+        
+
 
         # plot= pv.Plotter()
         # NURBS_1.plot_surface(plot)
@@ -712,61 +753,64 @@ def test_NURBS_1():
         #COUNT NUMBER OF ENFORCEMENTS TRIED
         
 
-        for i in range(1):
-            for j in range(1):
-                side_self=SurfaceEdge(i)
-                side_other=SurfaceEdge(j)
-                num_tried+=1
+        # for i in range(1):
+        #     for j in range(1):
+        #         side_self=SurfaceEdge(i)
+        #         side_other=SurfaceEdge(j)
+        #         num_tried+=1
 
-                #RESET TO ORIGINAL FOR EVERY ITERATION OF LOOP
+        #         #RESET TO ORIGINAL FOR EVERY ITERATION OF LOOP
 
-                NURBS_1=copy.deepcopy(NURBS_1_org)
-                NURBS_2=copy.deepcopy(NURBS_2_org)
+        #         NURBS_1=copy.deepcopy(NURBS_1_org)
+        #         NURBS_2=copy.deepcopy(NURBS_2_org)
 
-                try:
-                    NURBS_1.enforce_g0g1g2(NURBS_2, 1.0, side_self, side_other)
+    #             try:
+    #                 NURBS_1.enforce_g0g1g2(NURBS_2, 1.0, SurfaceEdge(0), SurfaceEdge(1))
 
-                    # plot= pv.Plotter()
-                    # NURBS_1.plot_surface(plot)
-                    # NURBS_1.plot_control_point_mesh_lines(plot)
-                    # NURBS_1.plot_control_points(plot)
-                    # NURBS_2.plot_surface(plot)
-                    # NURBS_2.plot_control_point_mesh_lines(plot)
-                    # NURBS_2.plot_control_points(plot)
-                    # plot.set_background('black')
-                    # plot.show()
-                # Verify G0, G1, and G2 continuity
-                    NURBS_1.verify_g0(NURBS_2, side_self, side_other)
-                    NURBS_1.verify_g1(NURBS_2, side_self, side_other)
-                    NURBS_1.verify_g2(NURBS_2, side_self, side_other)
-                except AssertionError:
-                    Assertion_error_counter+=1
-                    flag=True
-                    iges_entities = [NURBS_1.to_iges(),NURBS_2.to_iges()]
-                    cp_net_points, cp_net_lines = NURBS_1.generate_control_point_net()
-                    iges_entities.extend([cp_net_point.to_iges() for cp_net_point in cp_net_points])
-                    iges_entities.extend([cp_net_line.to_iges() for cp_net_line in cp_net_lines])
-                    cp_net_points_2, cp_net_lines_2 = NURBS_2.generate_control_point_net()
-                    iges_entities.extend([cp_net_point.to_iges() for cp_net_point in cp_net_points_2])
-                    iges_entities.extend([cp_net_line.to_iges() for cp_net_line in cp_net_lines_2])
+                    
+    #                 # plot= pv.Plotter()
+    #                 # NURBS_1.plot_surface(plot)
+    #                 # NURBS_1.plot_control_point_mesh_lines(plot)
+    #                 # NURBS_1.plot_control_points(plot)
+    #                 # NURBS_2.plot_surface(plot)
+    #                 # NURBS_2.plot_control_point_mesh_lines(plot)
+    #                 # NURBS_2.plot_control_points(plot)
+    #                 # plot.set_background('black')
+    #                 # plot.show()
+    #             # Verify G0, G1, and G2 continuity
+    #                 NURBS_1.verify_g0(NURBS_2, side_self, side_other)
+    #                 NURBS_1.verify_g1(NURBS_2, side_self, side_other)
+    #                 NURBS_1.verify_g2(NURBS_2, side_self, side_other)
 
-                    #iges_file = os.path.join(TEST_DIR, "Rat_Bez_test.igs")
-                    iges_file = os.path.join(r"C:\aerocaps-main\aerocaps\aerocaps\tests", "NURBS_test_3.igs")
-                    print(f"{iges_file=}")
-                    iges_generator = IGESGenerator(iges_entities, "meters")
-                    iges_generator.generate(iges_file)
-                    print("Generator passed")
 
-                except NegativeWeightError:
-                    Negative_error_counter+=1
+    #             except AssertionError:
+    #                 Assertion_error_counter+=1
+    #                 flag=True
+    #                 # iges_entities = [NURBS_1.to_iges(),NURBS_2.to_iges()]
+    #                 # cp_net_points, cp_net_lines = NURBS_1.generate_control_point_net()
+    #                 # iges_entities.extend([cp_net_point.to_iges() for cp_net_point in cp_net_points])
+    #                 # iges_entities.extend([cp_net_line.to_iges() for cp_net_line in cp_net_lines])
+    #                 # cp_net_points_2, cp_net_lines_2 = NURBS_2.generate_control_point_net()
+    #                 # iges_entities.extend([cp_net_point.to_iges() for cp_net_point in cp_net_points_2])
+    #                 # iges_entities.extend([cp_net_line.to_iges() for cp_net_line in cp_net_lines_2])
 
-    print(f'{n=},{num_tried=}')    
-    print(f'{n=},{Assertion_error_counter=}')
-    print(f'{n=},{Negative_error_counter=}')
+    #                 # #iges_file = os.path.join(TEST_DIR, "Rat_Bez_test.igs")
+    #                 # iges_file = os.path.join(r"C:\aerocaps-main\aerocaps\aerocaps\tests", "NURBS_test_3.igs")
+    #                 # print(f"{iges_file=}")
+    #                 # iges_generator = IGESGenerator(iges_entities, "meters")
+    #                 # iges_generator.generate(iges_file)
+    #                 # print("Generator passed")
+
+    #             except NegativeWeightError:
+    #                 Negative_error_counter+=1
+
+    # print(f'{n=},{num_tried=}')    
+    # print(f'{n=},{Assertion_error_counter=}')
+    # print(f'{n=},{Negative_error_counter=}')
     #print(f'{fail_case_1=},{fail_case_2=}')
 
     # return fail_case_1,fail_case_2,weight_case1,weight_case2
-#test_NURBS_1()
+test_NURBS_1()
 # fc1,fc2,w1,w2=test_Rational_Bezier_Surface_2()
 
 # print(f'{fc1=},{fc2=},{w1=},{w2=}')
