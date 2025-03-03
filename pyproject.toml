@@ -37,9 +37,23 @@ dependencies = [
     "pyvista",
     "pyiges",
     "shapely",
-    "rust-nurbs>=0.23"
+    "rust-nurbs>=0.23",
+    "triangle"
 ]
 dynamic = ["version"]
+
+[project.optional-dependencies]
+dev = [
+    "scipy",
+    "numpy",
+    "matplotlib",
+    "pyvista",
+    "pyiges",
+    "shapely",
+    "rust-nurbs>=0.23",
+    "triangle",
+    "pytest"
+]
 
 [tool.setuptools]
 packages = [
