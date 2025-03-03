@@ -716,7 +716,6 @@ def test_NURBS_1():
         FDM_second_der_self_array=np.zeros((10,3))
         FDM_first_der_self_array=np.zeros((10,3))
         for index in range(10):
-
             term1_1st=np.array([nurbs_surf_eval(new_cp1,new_weight_1,u_knot,v_knot,edge_par_vals[index],1.0)])[0]
             term2_1st=np.array([nurbs_surf_eval(new_cp1,new_weight_1,u_knot,v_knot,edge_par_vals[index],1.0-step)])[0]
             FDM_first_der_self_array[index,:]=(term1_1st-term2_1st)/step
