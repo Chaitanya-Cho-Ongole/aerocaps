@@ -698,43 +698,64 @@ def test_NURBS_1():
         # NURBS_2.plot_control_points(plot)
         # plot.set_background('black')
         # plot.show()
-
+        #print(f'{NURBS_1.weights=}')
         NURBS_1.enforce_g0g1g2(NURBS_2, 1.0,SurfaceEdge(0), SurfaceEdge(1))
+        #print(f'{NURBS_1.weights=}')
         # NURBS_1.verify_g0(NURBS_2, SurfaceEdge(0), SurfaceEdge(1))
         NURBS_1.verify_g1(NURBS_2, SurfaceEdge(0), SurfaceEdge(1))
         #NURBS_1.verify_g2(NURBS_2, SurfaceEdge(0), SurfaceEdge(1))
 
+        new_weight_1=NURBS_1.weights
+        new_cp1=NURBS_1.get_control_point_array()
         #COMPARE TO FDM
         pts_edge=10
         edge_par_vals=np.linspace(0,1,pts_edge)
-        step=1e-10
+        step=1e-6
+        FDM_second_der_other_array=np.zeros((10,3))
+        FDM_first_der_other_array=np.zeros((10,3))
         FDM_second_der_self_array=np.zeros((10,3))
         FDM_first_der_self_array=np.zeros((10,3))
         for index in range(10):
-            term1_1st=np.array([nurbs_surf_eval(cp_1,w_1,u_knot,v_knot,edge_par_vals[index],1.0)])[0]
-            term2_1st=np.array([nurbs_surf_eval(cp_1,w_1,u_knot,v_knot,edge_par_vals[index],1.0-step)])[0]
+
+            term1_1st=np.array([nurbs_surf_eval(new_cp1,new_weight_1,u_knot,v_knot,edge_par_vals[index],1.0)])[0]
+            term2_1st=np.array([nurbs_surf_eval(new_cp1,new_weight_1,u_knot,v_knot,edge_par_vals[index],1.0-step)])[0]
             FDM_first_der_self_array[index,:]=(term1_1st-term2_1st)/step
-            term1=np.array([nurbs_surf_eval(cp_1,w_1,u_knot,v_knot,edge_par_vals[index],1.0)])[0]
-            term2=np.array([nurbs_surf_eval(cp_1,w_1,u_knot,v_knot,edge_par_vals[index],1.0-step)])[0]
-            term3=np.array([nurbs_surf_eval(cp_1,w_1,u_knot,v_knot,edge_par_vals[index],1.0-2*step)])[0]
+            term1_1st=np.array([nurbs_surf_eval(cp_2,w_2,u_knot,v_knot,edge_par_vals[index],0.0)])[0]
+            term2_1st=np.array([nurbs_surf_eval(cp_2,w_2,u_knot,v_knot,edge_par_vals[index],0.0+step)])[0]
+            FDM_first_der_other_array[index,:]=-(term1_1st-term2_1st)/step
+
+            term1=np.array([nurbs_surf_eval(new_cp1,new_weight_1,u_knot,v_knot,edge_par_vals[index],1.0)])[0]
+            term2=np.array([nurbs_surf_eval(new_cp1,new_weight_1,u_knot,v_knot,edge_par_vals[index],1.0-step)])[0]
+            term3=np.array([nurbs_surf_eval(new_cp1,new_weight_1,u_knot,v_knot,edge_par_vals[index],1.0-2*step)])[0]
             FDM_second_der_self_array[index,:]=(term1-2*term2+term3)/(step**2)
+
+            term1=np.array([nurbs_surf_eval(cp_2,w_2,u_knot,v_knot,edge_par_vals[index],0.0)])[0]
+            term2=np.array([nurbs_surf_eval(cp_2,w_2,u_knot,v_knot,edge_par_vals[index],0.0+step)])[0]
+            term3=np.array([nurbs_surf_eval(cp_2,w_2,u_knot,v_knot,edge_par_vals[index],0.0+2*step)])[0]
+            FDM_second_der_other_array[index,:]=(term1-2*term2+term3)/(step**2)
+
         print(f'{FDM_first_der_self_array=}')
+        print(f'{FDM_first_der_other_array=}')
+        
         print(f'{FDM_second_der_self_array=}')
+        print(f'{FDM_second_der_other_array=}')
 
-        iges_entities = [NURBS_1.to_iges(),NURBS_2.to_iges()]
-        cp_net_points, cp_net_lines = NURBS_1.generate_control_point_net()
-        iges_entities.extend([cp_net_point.to_iges() for cp_net_point in cp_net_points])
-        iges_entities.extend([cp_net_line.to_iges() for cp_net_line in cp_net_lines])
-        cp_net_points_2, cp_net_lines_2 = NURBS_2.generate_control_point_net()
-        iges_entities.extend([cp_net_point.to_iges() for cp_net_point in cp_net_points_2])
-        iges_entities.extend([cp_net_line.to_iges() for cp_net_line in cp_net_lines_2])
 
-        #iges_file = os.path.join(TEST_DIR, "Rat_Bez_test.igs")
-        iges_file = os.path.join(r"C:\aerocaps-main\aerocaps\aerocaps\tests", "NURBS_test_3.igs")
-        print(f"{iges_file=}")
-        iges_generator = IGESGenerator(iges_entities, "meters")
-        iges_generator.generate(iges_file)
-        print("Generator passed")
+
+        # iges_entities = [NURBS_1.to_iges(),NURBS_2.to_iges()]
+        # cp_net_points, cp_net_lines = NURBS_1.generate_control_point_net()
+        # iges_entities.extend([cp_net_point.to_iges() for cp_net_point in cp_net_points])
+        # iges_entities.extend([cp_net_line.to_iges() for cp_net_line in cp_net_lines])
+        # cp_net_points_2, cp_net_lines_2 = NURBS_2.generate_control_point_net()
+        # iges_entities.extend([cp_net_point.to_iges() for cp_net_point in cp_net_points_2])
+        # iges_entities.extend([cp_net_line.to_iges() for cp_net_line in cp_net_lines_2])
+
+        # #iges_file = os.path.join(TEST_DIR, "Rat_Bez_test.igs")
+        # iges_file = os.path.join(r"C:\aerocaps-main\aerocaps\aerocaps\tests", "NURBS_test_3.igs")
+        # print(f"{iges_file=}")
+        # iges_generator = IGESGenerator(iges_entities, "meters")
+        # iges_generator.generate(iges_file)
+        # print("Generator passed")
 
         NURBS_1.verify_g2(NURBS_2, SurfaceEdge(0), SurfaceEdge(1))
         

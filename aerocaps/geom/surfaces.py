@@ -6722,8 +6722,8 @@ class NURBSSurface(Surface):
         #print(f"{self_perp_edge_derivs=},{other_perp_edge_derivs=}")
         self_perp_edge_derivs[np.absolute(self_perp_edge_derivs) < 1e-6] = 0.0
         other_perp_edge_derivs[np.absolute(other_perp_edge_derivs) < 1e-6] = 0.0
-        # print(f'{self_perp_edge_derivs=}')
-        # print(f'{other_perp_edge_derivs=}')
+        print(f'{self_perp_edge_derivs=}')
+        print(f'{other_perp_edge_derivs=}')
 
         ratios_other_self = other_perp_edge_derivs / self_perp_edge_derivs
         #print(f"{ratios_other_self=}")
